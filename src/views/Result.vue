@@ -7,7 +7,7 @@
           v-row(align-content="end").mt-8
             v-text-field(v-model="repository" solo )
         v-col(cols='2')
-            v-btn(@click="search(repo)" large color="primary") Поиск
+            v-btn(@click="search" large color="primary") Поиск
     v-container
       v-data-table.elevation-1(
         :headers="headers"
@@ -15,6 +15,7 @@
         :server-items-length="pagination.totalItems"
         :loading="loading"
         :items="items"
+        :footer-props="footerProps"
 
         )
           template(v-slot:item.stars='{ item }')
@@ -29,7 +30,6 @@
 </template>>
 
 <script>
-import axios from 'axios'
 import logo from '@/assets/main.svg'
 
 export default {
@@ -49,6 +49,9 @@ export default {
       ],
       loading:false,
       logo: logo,
+      footerProps: {
+        'disable-items-per-page': true
+      }
     }
   },
   computed:{
@@ -76,87 +79,41 @@ export default {
     }
   },
   created(){
-    // this.search(this.getRepos)
-    // this.$store.dispatch('frdEventListner')
+    
   },
   methods:{
-    async search(repo){
-      this.forks=[]
-      const response = await axios.post(`/github`, {
-        repo:repo
-      })
-      this.pageLoading = false
-      this.lastPage = 1
-      this.pagination.page = 1
-      this.forks = response.data.forks
-      this.pagination.count = response.data.count
-      this.links = response.data.links
-    },
     newTab(url){
       window.open(url, '_blank');
     },
-    test(){
-      console.log(this.page)
-      console.log(this.pageCount)
-    },
-    async getDataFromApi(page,links){
-        console.log(page)
-      if(page > this.lastPage){
-        
-        this.lastPage = this.page
-        this.page = page
-        this.loading = true
-        this.forks = []
-        let url = links.next;
-        
-        url = url.substring(0,url.indexOf('page='))
-        url +="page="+ page
-        
-        this.$store.dispatch('fetchNext', {url, page})
-        this.loading = false
-      } else if (page < this.lastPage){
-        this.page = page
-      }
-    },
-
-    async getDataFromApi2(page,links){
-        console.log(page)
-      if(page > this.lastPage){
-        
-        this.lastPage = this.page
-        this.page = page
-        this.loading = true
-        this.forks = []
-        let url = links.next;
-        
-        url = url.substring(0,url.indexOf('page='))
-        url +="page="+ page
-        
-        this.$store.dispatch('fetchNext', {url, page})
-        this.loading = false
-      } else if (page < this.lastPage){
-        this.page = page
-      }
-    },
     setFavorite(item){
         item.isFavorite = true
-        this.$store.dispatch('frdSaveFork', item)
+        this.$store.dispatch('saveFavorite', item)
     },
     delFavorite(item){
         console.log('deleting',item)
     },
-    
+    search(){      
+      this.$store.dispatch('search')
+    },
   },
   watch: {
     pagination: {
-      handler ($event) {
-        console.log($event)
-        this.loading = true
+      handler () {
         this.$store.dispatch('queryItems')  
-        this.loading = false
+      },
+      deep: true
+    },
+    items: {
+      handler() {
+        if(this.items.length>0) {
+          this.loading = false
+        } else {
+          this.loading = true
+        }
       },
       deep: true
     }
   }
+    
 }
 </script>
