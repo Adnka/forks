@@ -11,7 +11,7 @@ Vue.use(VueRouter)
     component: Home
   },
   {
-    path: '/search/:owner/:repository',
+    path: '/search/results',
     name: 'Result',
     component: () => import(/* webpackChunkName: "about" */ '../views/Result.vue'),
   }

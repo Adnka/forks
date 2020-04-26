@@ -5,15 +5,16 @@
       v-row(align='center', justify='center')
         v-col(cols='6')
           v-row(align-content="end").mt-8
-            v-text-field(v-model="repo" solo )
+            v-text-field(v-model="repository" solo )
         v-col(cols='2')
             v-btn(@click="search(repo)" large color="primary") Поиск
     v-container
-      v-data-table.elevation-1(:headers='headers', :items='forks', :items-per-page='30'
-        hide-default-footer
-        disable-sort
+      v-data-table.elevation-1(
+        :headers="headers"
+        :options.sync="pagination"
+        :server-items-length="pagination.totalItems"
         :loading="loading"
-        loading-text="Загрузка"
+        :items="items"
 
         )
           template(v-slot:item.stars='{ item }')
@@ -24,7 +25,7 @@
           template(v-slot:item.favoriteButton='{item}')
             v-icon(small text color="yellow" @click="setFavorite(item)")(v-if="!item.isFavorite") mdi-star-outline
             v-icon(small  text color="yellow" @click="delFavorite(item)")(v-else) mdi-star
-      v-pagination(v-model="pagination.page" :length="pagination.count"  circle)
+
 </template>>
 
 <script>
@@ -32,6 +33,7 @@ import axios from 'axios'
 import logo from '@/assets/main.svg'
 
 export default {
+  
   data(){
     return{
       headers:[
@@ -45,32 +47,37 @@ export default {
           { text: 'Url', value: 'forkUrl' },
           { text: 'Favorite', value: 'favoriteButton'}
       ],
-      pageLoading:true,
-      pagination:{
-        page:1,
-        count:1,
-      },
-      lastPage:1,
-      links:{},
-      forks:[],
-      star: {
-      },
       loading:false,
       logo: logo,
-      repo: this.$route.params.owner + '/' + this.$route.params.repository
-
     }
   },
   computed:{
-    getRepos(){
-      let owner = this.$route.params.owner
-      let repos = this.$route.params.repository
-      return owner + '/'+repos
+    pagination: {
+      get: function () {
+        return this.$store.getters.pagination
+      },
+      set: function (value) {
+        this.$store.commit('setPagination', value)
+      }
     },
+    items () {
+      return this.$store.getters.items
+    },
+    repository: {
+      get: function () {
+        return this.$store.getters.repository
+      },
+      set: function (value) {
+        this.$store.commit('setPagination', value)
+      }
+    },
+    count() {
+      return this.$store.getters.count
+    }
   },
   created(){
-    this.search(this.getRepos)
-    this.$store.dispatch('frdEventListner')
+    // this.search(this.getRepos)
+    // this.$store.dispatch('frdEventListner')
   },
   methods:{
     async search(repo){
@@ -79,7 +86,6 @@ export default {
         repo:repo
       })
       this.pageLoading = false
-      // this.$store.dispatch('setState',response.data)
       this.lastPage = 1
       this.pagination.page = 1
       this.forks = response.data.forks
@@ -89,28 +95,47 @@ export default {
     newTab(url){
       window.open(url, '_blank');
     },
-    async getDataFromApi(page){
+    test(){
+      console.log(this.page)
+      console.log(this.pageCount)
+    },
+    async getDataFromApi(page,links){
         console.log(page)
-      if(page != this.lastPage){
+      if(page > this.lastPage){
+        
+        this.lastPage = this.page
+        this.page = page
         this.loading = true
         this.forks = []
-        let url;
-        if(page > this.lastPage){
-          url = this.links.next
-        } else {
-          url =  this.links.prev
-        }
+        let url = links.next;
+        
         url = url.substring(0,url.indexOf('page='))
         url +="page="+ page
-        const response = await axios.post(`/url`, {
-          url:url,
-          page:page
-        })
-
-        this.forks = response.data.forks
-        this.links = response.data.links
-        this.lastPage = this.pagination.page
+        
+        this.$store.dispatch('fetchNext', {url, page})
         this.loading = false
+      } else if (page < this.lastPage){
+        this.page = page
+      }
+    },
+
+    async getDataFromApi2(page,links){
+        console.log(page)
+      if(page > this.lastPage){
+        
+        this.lastPage = this.page
+        this.page = page
+        this.loading = true
+        this.forks = []
+        let url = links.next;
+        
+        url = url.substring(0,url.indexOf('page='))
+        url +="page="+ page
+        
+        this.$store.dispatch('fetchNext', {url, page})
+        this.loading = false
+      } else if (page < this.lastPage){
+        this.page = page
       }
     },
     setFavorite(item){
@@ -124,15 +149,14 @@ export default {
   },
   watch: {
     pagination: {
-        handler () {
-          console.log(this.pagination.page)
-          console.log(this.lastPage)
-            this.getDataFromApi(this.pagination.page)
-             
-            
-          },
-          deep: true,
+      handler ($event) {
+        console.log($event)
+        this.loading = true
+        this.$store.dispatch('queryItems')  
+        this.loading = false
       },
-  },
+      deep: true
+    }
+  }
 }
 </script>
