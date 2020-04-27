@@ -33,14 +33,14 @@ app.post("/github", async function(req,res){
 app.post("/url", async function(req,res){
     try{
         const response = await axios.get(`${req.body.url}`)
-        const page = req.body.page
+        let id = req.body.url.substring(req.body.url.indexOf('page='))
         var maped = response.data.map(o => {
             return {
                 forkUrl: o.forks_url,
                 forkName: o.full_name,
                 stars: o.stargazers_count,
                 forkOwnerLogin: o.owner.login,
-                searchUrl : `https://github.com/search?p=${page}&q=${o.name}&type=Repositories`,
+                searchUrl : `https://github.com/search?p=${id}&q=${o.name}&type=Repositories`,
                 isFavorite:false
             }
         })

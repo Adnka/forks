@@ -17,9 +17,12 @@ const config = {
   appId: "1:26860057867:web:d7c3bec5fcfb9732845e0e"
 };
 
+
+
 firebase.initializeApp(config)
 const db = firebase.database()
 const favorites = db.ref('favorites')
+
 
 export default new Vuex.Store({
   strict:false,
@@ -34,6 +37,7 @@ export default new Vuex.Store({
     links: {},
     forks:[],
     count: 1,
+    favoritesArray: []
   },
   mutations: {
     setPagination (state, payload) {
@@ -54,18 +58,36 @@ export default new Vuex.Store({
         state.forks.push(i)
       })
     },
+    updateItems(state,payload){
+      Vue.set(state,'items',payload)
+    },
+    updateForks(state,payload){
+      state.forks = payload
+    },
     setCount(state, payload) {
       state.count = payload
     },
     setTotalItems(state,payload) {
       Vue.set(state.pagination, 'totalItems', payload)
+    },
+    updateFavoritesArray(state,payload) {
+      state.favoritesArray = payload
     }
   },
   actions: {
     async queryItems (context) {
       const { page, itemsPerPage } = context.state.pagination
-
       let items = context.state.forks.slice()
+
+      items.forEach(item => {
+        if(context.state.favoritesArray.includes(item.forkName)){
+          item.isFavorite = true
+        } else {
+          item.isFavorite = false
+        }
+      })
+
+
       const totalItems = items.length
 
         if (itemsPerPage > 0) {
@@ -73,8 +95,12 @@ export default new Vuex.Store({
         }
 
         context.commit('_setItems', { items, totalItems })
+
+        console.log(context.state.favoritesArray)
     },
     async search (context){
+      await context.dispatch('getFavorites')
+      await context.dispatch('deleteFavoriteTracking')
       const { page, itemsPerPage } = context.state.pagination
 
       const response = await axios.post(`/github`, {
@@ -82,6 +108,14 @@ export default new Vuex.Store({
       })
 
       let items = response.data.forks.slice()
+      items.forEach(item => {
+        if(context.state.favoritesArray.includes(item.forkName)){
+          item.isFavorite = true
+        } else {
+          item.isFavorite = false
+        }
+      })
+      
       let totalItems = response.data.forks.length
       let links = response.data.links
       let count = response.data.count
@@ -101,11 +135,10 @@ export default new Vuex.Store({
       let links = context.state.links
       let nextUrl = links.next
 
-      let page = context.state.pagination.page
+
       while(Object.prototype.hasOwnProperty.call(links, 'next')) {
         const response = await axios.post(`/url`, {
           url:nextUrl,
-          page:page
         })
         links = response.data.links
         context.commit('setForks', response.data.forks)
@@ -115,8 +148,62 @@ export default new Vuex.Store({
 
     saveFavorite(context, item) {
       console.log(context)
-      favorites.push().set(item)
+      favorites.child(item.forkName).set(item)
+      let temp = context.state.favoritesArray
+      temp.push(item.forkName)
+      context.commit('updateFavoritesArray', temp)
     },
+
+    deleteFavorite(context,item){
+      let temp = context.state.favoritesArray
+      let id = temp.indexOf(item.forkName)
+        
+        if(id > -1) {
+          temp.splice(id,1)
+          context.commit('updateFavoritesArray', temp)
+        }
+        favorites.child(item.forkName).remove()
+    },
+
+    getFavorites(context){
+      favorites.once('value', snapshot =>{
+        snapshot.forEach(i=>{
+          let temp = context.state.favoritesArray
+          let owner = i.key
+          let child = i.val()
+          let keys = Object.keys(child) 
+          keys.forEach(item => {
+            temp.push(`${owner}/${item}`)
+          })
+          context.commit('updateFavoritesArray', temp)
+        })
+      })
+    },
+
+    deleteFavoriteTracking(context) {
+      favorites.on('child_removed', snapshot=>{
+        let owner = snapshot.key
+        let repo = Object.keys(snapshot.val())[0]
+        let target = `${owner}/${repo}`
+        let temp = context.state.favoritesArray
+        let id = temp.indexOf(target)
+        
+        console.log(id)
+        if(id > -1) {
+          temp.splice(id,1)
+          let obj = context.state.items.find(x => x.forkName === target)
+          obj.isFavorite = false
+          let fobj = context.state.forks.find(x => x.forkName === target)
+          fobj.isFavorite = false
+          console.log(context.state.items)
+          context.commit('updateItems', context.state.items)
+          context.commit('updateForks', context.state.forks)
+          context.commit('updateFavoritesArray', temp)
+
+        }
+      })
+    }
+
 
   },
   modules: {

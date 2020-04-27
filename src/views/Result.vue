@@ -90,7 +90,8 @@ export default {
         this.$store.dispatch('saveFavorite', item)
     },
     delFavorite(item){
-        console.log('deleting',item)
+        item.isFavorite = false
+        this.$store.dispatch('deleteFavorite', item)
     },
     search(){      
       this.$store.dispatch('search')
